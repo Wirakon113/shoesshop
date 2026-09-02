@@ -1,19 +1,57 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, LoginCredentials, RegisterFormData, UserRole } from '../types';
-import {
-  INITIAL_MOCK_USERS,
-  USERS_STORAGE_KEY,
-  CURRENT_USER_STORAGE_KEY,
-  REMEMBERED_USERNAME_KEY,
-  getStoredMockUsers,
-  saveMockUsers,
-  addMockUser,
-  updateMockUser as syncUpdateMockUser,
-  deleteMockUser as syncDeleteMockUser,
-  resetMockUsersToDefault,
-} from '../data/mockUsers';
 
-export const INITIAL_USERS: User[] = INITIAL_MOCK_USERS;
+const USERS_STORAGE_KEY = 'shoes_shop_users_v2';
+const CURRENT_USER_STORAGE_KEY = 'shoes_shop_current_user_v2';
+const REMEMBERED_USERNAME_KEY = 'shoes_shop_remembered_username_v1';
+
+export const INITIAL_USERS: User[] = [
+  {
+    id: 'user_admin_1',
+    name: 'ผู้ดูแลระบบ',
+    lastname: 'ShoesShop',
+    email: 'admin@shoesshop.com',
+    phone: '081-234-5678',
+    address: '100/1 ศูนย์การค้าสยามสแควร์ แขวงปทุมวัน',
+    district: 'ปทุมวัน',
+    province: 'กรุงเทพมหานคร',
+    postalCode: '10330',
+    username: 'admin2547',
+    password: 'admin2547',
+    role: 'admin',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'user_demo_1',
+    name: 'สมชาย',
+    lastname: 'ใจดี',
+    email: 'somchai@example.com',
+    phone: '089-987-6543',
+    address: '99/1 ถ.สุขุมวิท แขวงคลองเตย',
+    district: 'คลองเตย',
+    province: 'กรุงเทพมหานคร',
+    postalCode: '10110',
+    username: 'demo',
+    password: 'password123',
+    role: 'user',
+    createdAt: '2026-02-15T08:30:00.000Z',
+  },
+  {
+    id: 'user_demo_2',
+    name: 'กานดา',
+    lastname: 'รักษ์ดี',
+    email: 'kanda.r@example.com',
+    phone: '084-555-1234',
+    address: '254/8 ซอยทองหล่อ 10 แขวงคลองตันเหนือ',
+    district: 'วัฒนา',
+    province: 'กรุงเทพมหานคร',
+    postalCode: '10110',
+    username: 'kanda',
+    password: 'password123',
+    role: 'user',
+    createdAt: '2026-03-01T10:15:00.000Z',
+  }
+];
 
 interface AuthContextType {
   currentUser: User | null;
@@ -34,7 +72,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => {
-    return getStoredMockUsers();
+    try {
+      const stored = localStorage.getItem(USERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure admin2547 exists in parsed
+          const hasAdmin = parsed.some((u: User) => u.username.toLowerCase() === 'admin2547');
+          let updatedList = parsed.map((u: User) => ({
+            ...u,
+            role: u.role || (u.username.toLowerCase() === 'admin2547' ? 'admin' : 'user'),
+          }));
+
+          if (!hasAdmin) {
+            updatedList = [INITIAL_USERS[0], ...updatedList];
+          }
+          return updatedList;
+        }
+      }
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
+      return INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -63,12 +123,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Save users to localStorage and MOCK_USERS whenever updated
+  // Save users to localStorage whenever updated
   useEffect(() => {
     try {
-      saveMockUsers(users);
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
     } catch (e) {
-      console.error('Failed to sync users to mock storage', e);
+      console.error('Failed to save users to localStorage', e);
     }
   }, [users]);
 
@@ -258,8 +318,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetUserStore = () => {
-    const defaultUsers = resetMockUsersToDefault();
-    setUsers(defaultUsers);
+    setUsers(INITIAL_USERS);
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
   };
 
   return (
