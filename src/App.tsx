@@ -1,3 +1,4 @@
+//ecommerce app shoes shop 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
