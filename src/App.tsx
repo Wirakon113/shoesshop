@@ -1,4 +1,3 @@
-//ecommerce app shoes shop 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
@@ -24,7 +23,7 @@ function AppShell() {
   const { isCheckoutModalOpen, setIsCheckoutModalOpen } = useStore();
 
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <ScrollToTop />
       <div className="flex flex-col min-h-screen bg-white text-black selection:bg-black selection:text-white">
         <Navbar />
