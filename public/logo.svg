@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <!-- Circle Frame (Broken at bottom by ground line and shoe) -->
+  <circle cx="250" cy="240" r="170" fill="none" stroke="currentColor" stroke-width="16" />
+  
+  <!-- Ground Line -->
+  <line x1="70" y1="330" x2="430" y2="330" stroke="currentColor" stroke-width="14" stroke-linecap="round" />
+  
+  <!-- Sneaker Silhouette Group -->
+  <g fill="currentColor">
+    <!-- Main Shoe Upper (Black body) -->
+    <path d="M110,270 C105,250 115,225 125,200 C135,185 155,185 165,205 C175,225 190,235 210,210 C225,170 240,165 255,170 C270,180 290,215 315,235 C345,255 385,260 415,275 C425,280 425,295 415,300 C395,305 370,305 340,300 C270,290 190,285 130,290 C115,290 112,280 110,270 Z" />
+    
+    <!-- White Inner Accents on the Upper (Chevron / Stripe) -->
+    <path d="M135,210 C145,195 155,200 160,215 C165,235 185,245 220,205 C235,185 245,180 255,185 C250,200 240,225 215,245 C190,265 160,265 140,250 Z" fill="var(--bg-color, #ffffff)" />
+    
+    <!-- White Eyelets / Lace Accents -->
+    <path d="M250,195 L265,205 L255,215 L240,205 Z" fill="var(--bg-color, #ffffff)" />
+    <path d="M268,210 L283,220 L273,230 L258,220 Z" fill="var(--bg-color, #ffffff)" />
+    <path d="M286,225 L301,235 L291,245 L276,235 Z" fill="var(--bg-color, #ffffff)" />
+    <path d="M304,240 L319,250 L309,260 L294,250 Z" fill="var(--bg-color, #ffffff)" />
+
+    <!-- White Dynamic Side Stripe Band -->
+    <path d="M165,240 C200,240 230,230 270,255 L245,290 L220,290 C180,275 160,255 165,240 Z" fill="var(--bg-color, #ffffff)" />
+
+    <!-- White Midsole Wave Cushion -->
+    <path d="M95,285 C100,270 120,280 145,285 C220,295 320,300 395,290 C420,285 425,295 410,310 C380,330 330,330 250,325 C170,320 120,335 100,320 C90,310 90,295 95,285 Z" fill="var(--bg-color, #ffffff)" stroke="currentColor" stroke-width="6" />
+
+    <!-- Black Outsole Base -->
+    <path d="M100,320 C120,335 170,320 250,325 C330,330 380,330 410,310 C418,318 410,330 380,335 C320,342 220,340 140,335 C110,332 95,326 100,320 Z" fill="currentColor" />
+  </g>
+</svg>

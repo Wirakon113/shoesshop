@@ -1,0 +1,6 @@
+{
+  "name": "Shoes Shop",
+  "description": "Minimalist Black & White Sneaker E-Commerce Store with Product Listing, Details, Cart, and Inventory Management",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
