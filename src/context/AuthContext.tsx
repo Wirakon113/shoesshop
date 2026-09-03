@@ -41,7 +41,7 @@ export const INITIAL_USERS: User[] = [
     name: 'กานดา',
     lastname: 'รักษ์ดี',
     email: 'kanda.r@example.com',
-    phone: '084-555-1234',
+    phone: '084-555-1235',
     address: '254/8 ซอยทองหล่อ 10 แขวงคลองตันเหนือ',
     district: 'วัฒนา',
     province: 'กรุงเทพมหานคร',
