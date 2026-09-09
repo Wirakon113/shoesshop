@@ -17,10 +17,11 @@ import {
   MapPin,
   ShieldCheck,
   PackageCheck,
+  Sparkles,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { cartCount, setIsCartDrawerOpen, showToast } = useStore();
+  const { cartCount, setIsCartDrawerOpen, showToast, setIsQuizOpen } = useStore();
   const { currentUser, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -111,6 +112,15 @@ export const Navbar: React.FC = () => {
               <NavLink to="/shop" className={navLinkClass}>
                 Shop
               </NavLink>
+              <button
+                type="button"
+                id="navbar-shoe-finder-btn"
+                onClick={() => setIsQuizOpen(true)}
+                className="text-xs uppercase tracking-widest font-black transition-all duration-200 py-1.5 px-3 flex items-center gap-1.5 bg-black text-white hover:bg-neutral-800 shadow-xs cursor-pointer border border-black"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                <span>Shoe Finder</span>
+              </button>
               <NavLink to="/orders" className={navLinkClass}>
                 ประวัติคำสั่งซื้อ
               </NavLink>
@@ -440,6 +450,21 @@ export const Navbar: React.FC = () => {
                 <span>Shop All Sneakers</span>
                 <ArrowRight className="w-4 h-4 text-neutral-400" />
               </Link>
+              <button
+                type="button"
+                id="mobile-nav-shoe-finder-btn"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsQuizOpen(true);
+                }}
+                className="text-sm uppercase tracking-widest font-bold py-2.5 px-3 bg-black text-white flex items-center justify-between my-1"
+              >
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>Shoe Finder (ค้นหารองเท้า)</span>
+                </span>
+                <ArrowRight className="w-4 h-4 text-white" />
+              </button>
               <Link
                 to="/orders"
                 onClick={() => setIsMobileMenuOpen(false)}

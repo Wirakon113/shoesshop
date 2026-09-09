@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
+import { useStore } from '../context/StoreContext';
 
 export const Hero: React.FC = () => {
+  const { setIsQuizOpen } = useStore();
   return (
     <section id="hero-section" className="relative bg-white overflow-hidden border-b border-[#E5E5E5] min-h-[520px] lg:min-h-[580px] flex items-center">
       {/* Huge Background Watermark Typography */}
@@ -27,19 +29,29 @@ export const Hero: React.FC = () => {
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            <div className="flex flex-wrap items-center gap-3.5 pt-2">
               <Link
                 to="/shop"
                 id="hero-shop-now-btn"
-                className="bg-black text-white px-10 py-4 text-xs font-bold uppercase tracking-widest hover:bg-[#222222] transition-colors inline-flex items-center gap-3 group shadow-md"
+                className="bg-black text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-[#222222] transition-colors inline-flex items-center gap-2.5 group shadow-md"
               >
                 <span>SHOP NOW</span>
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1.5" />
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </Link>
+
+              <button
+                type="button"
+                id="hero-quiz-cta-btn"
+                onClick={() => setIsQuizOpen(true)}
+                className="bg-white text-black border border-black px-6 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all inline-flex items-center gap-2 group cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500 group-hover:text-amber-300 group-hover:fill-amber-300" />
+                <span>ค้นหารองเท้าคู่ที่ใช่</span>
+              </button>
 
               <Link
                 to="/shop?category=Running"
-                className="bg-transparent text-black border-b-2 border-black pb-1 text-xs font-bold uppercase tracking-widest hover:opacity-60 transition-opacity"
+                className="bg-transparent text-black border-b border-neutral-300 pb-0.5 text-xs font-semibold uppercase tracking-wider hover:border-black transition-colors"
               >
                 Explore Running
               </Link>

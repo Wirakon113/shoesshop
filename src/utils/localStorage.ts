@@ -203,6 +203,16 @@ export function getStoredProducts(): Product[] {
     if (hasMigrated) {
       localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(sanitized));
     }
+
+    // Automatically append any newly added INITIAL_PRODUCTS that are not in localStorage
+    const existingIds = new Set(sanitized.map((p: Product) => p.id));
+    const missingProducts = INITIAL_PRODUCTS.filter((p) => !existingIds.has(p.id));
+    if (missingProducts.length > 0) {
+      const merged = [...sanitized, ...missingProducts];
+      localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(merged));
+      return merged;
+    }
+
     return sanitized;
   } catch (error) {
     console.error('Error reading products from localStorage:', error);

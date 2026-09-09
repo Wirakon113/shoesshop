@@ -105,3 +105,17 @@ export interface Order {
   createdAt: string;
   notes?: string;
 }
+
+export interface QuizAnswers {
+  activity: 'all' | 'Running' | 'Lifestyle' | 'Training' | 'Basketball';
+  style: 'all' | 'minimal' | 'sporty' | 'urban' | 'hightop';
+  feature: 'all' | 'lightweight' | 'cushion' | 'stability' | 'durable';
+  size: number | null; // e.g. 42 or null for any size
+  budget: 'all' | 'budget' | 'mid' | 'premium';
+}
+
+export interface QuizResultProduct extends Product {
+  matchScore: number;
+  matchReasons: string[];
+  matchedTags: string[];
+}

@@ -28,6 +28,8 @@ interface StoreContextType {
   setIsCartDrawerOpen: (open: boolean) => void;
   isCheckoutModalOpen: boolean;
   setIsCheckoutModalOpen: (open: boolean) => void;
+  isQuizOpen: boolean;
+  setIsQuizOpen: (open: boolean) => void;
   quickViewProduct: Product | null;
   setQuickViewProduct: (product: Product | null) => void;
   addToCart: (product: Product, size: number, quantity?: number) => void;
@@ -59,6 +61,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [orders, setOrders] = useState<Order[]>(() => getStoredOrders());
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [toasts, setToasts] = useState<ToastState[]>([]);
 
@@ -283,6 +286,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsCartDrawerOpen,
         isCheckoutModalOpen,
         setIsCheckoutModalOpen,
+        isQuizOpen,
+        setIsQuizOpen,
         quickViewProduct,
         setQuickViewProduct,
         addToCart,

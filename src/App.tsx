@@ -9,6 +9,7 @@ import { QuickViewModal } from './components/QuickViewModal';
 import { CheckoutModal } from './components/CheckoutModal';
 import { ToastContainer } from './components/Toast';
 import { ScrollToTop } from './components/ScrollToTop';
+import { ShoeFinderModal } from './components/ShoeFinderModal';
 
 import { Home } from './pages/Home';
 import { Shop } from './pages/Shop';
@@ -18,9 +19,10 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { OrderHistory } from './pages/OrderHistory';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { ShoeFinderPage } from './pages/ShoeFinderPage';
 
 function AppShell() {
-  const { isCheckoutModalOpen, setIsCheckoutModalOpen } = useStore();
+  const { isCheckoutModalOpen, setIsCheckoutModalOpen, isQuizOpen, setIsQuizOpen } = useStore();
 
   return (
     <Router basename={import.meta.env.BASE_URL}>
@@ -39,6 +41,8 @@ function AppShell() {
             <Route path="/add-product" element={<AdminDashboard />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/quiz" element={<ShoeFinderPage />} />
+            <Route path="/shoe-finder" element={<ShoeFinderPage />} />
             {/* Fallback route */}
             <Route path="*" element={<Home />} />
           </Routes>
@@ -49,6 +53,10 @@ function AppShell() {
         {/* Global UI Overlays */}
         <CartDrawer />
         <QuickViewModal />
+        <ShoeFinderModal
+          isOpen={isQuizOpen}
+          onClose={() => setIsQuizOpen(false)}
+        />
         <CheckoutModal
           isOpen={isCheckoutModalOpen}
           onClose={() => setIsCheckoutModalOpen(false)}

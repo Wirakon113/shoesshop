@@ -63,6 +63,14 @@ export const Footer: React.FC = () => {
             <h4 className="text-xs uppercase tracking-[0.25em] font-bold text-white">Shop</h4>
             <ul className="space-y-3 text-sm text-neutral-400">
               <li>
+                <Link to="/quiz" className="text-white font-bold flex items-center gap-1.5 hover:underline">
+                  <span>Shoe Finder Quiz</span>
+                  <span className="text-[9px] bg-white text-black px-1.5 py-0.2 font-black uppercase tracking-widest">
+                    QUIZ
+                  </span>
+                </Link>
+              </li>
+              <li>
                 <Link to="/shop" className="hover:text-white transition-colors">
                   All Sneakers
                 </Link>

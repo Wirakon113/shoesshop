@@ -3,6 +3,7 @@ import { Hero } from '../components/Hero';
 import { ValueProps } from '../components/ValueProps';
 import { FeaturedProducts } from '../components/FeaturedProducts';
 import { BrandSection } from '../components/BrandSection';
+import { ShoeFinderBanner } from '../components/ShoeFinderBanner';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
@@ -17,6 +18,9 @@ export const Home: React.FC = () => {
 
       {/* Featured Products Section (4 items with zoom effect) */}
       <FeaturedProducts />
+
+      {/* Interactive Shoe Finder Banner */}
+      <ShoeFinderBanner />
 
       {/* Category Quick Banners */}
       <section className="bg-white py-16 border-b border-[#E5E5E5]">
