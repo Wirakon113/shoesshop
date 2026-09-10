@@ -10,7 +10,7 @@ export const INITIAL_USERS: User[] = [
     id: 'user_admin_1',
     name: 'ผู้ดูแลระบบ',
     lastname: 'ShoesShop',
-    email: 'admin@gmail.com.com', 
+    email: 'admin@shoesshop.com',
     phone: '081-234-5678',
     address: '100/1 ศูนย์การค้าสยามสแควร์ แขวงปทุมวัน',
     district: 'ปทุมวัน',
