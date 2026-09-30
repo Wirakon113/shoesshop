@@ -18,7 +18,10 @@ import {
   ShieldCheck,
   PackageCheck,
   Sparkles,
+  Bell,
 } from 'lucide-react';
+import { SubscriptionModal } from './SubscriptionModal';
+import { ApiStatusBadge } from './ApiStatusBadge';
 
 export const Navbar: React.FC = () => {
   const { cartCount, setIsCartDrawerOpen, showToast, setIsQuizOpen } = useStore();
@@ -27,6 +30,7 @@ export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const userMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -144,6 +148,8 @@ export const Navbar: React.FC = () => {
 
           {/* Action Icons (Top Right) */}
           <div className="flex items-center space-x-3 sm:space-x-4">
+            {/* DB mode badge: SQLite (API) vs Local (localStorage) */}
+            <ApiStatusBadge />
             {/* Search Pill Capsule */}
             <button
               id="navbar-search-btn"
@@ -303,6 +309,16 @@ export const Navbar: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Subscription Button */}
+            <button
+              id="navbar-subscription-btn"
+              onClick={() => setIsSubscriptionOpen(true)}
+              className="p-2 text-black hover:bg-[#F5F5F5] rounded-full transition-colors relative"
+              aria-label="Subscription"
+            >
+              <Bell className="w-6 h-6 stroke-[1.75]" />
+            </button>
 
             {/* Shopping Bag Trigger */}
             <button
@@ -499,7 +515,10 @@ export const Navbar: React.FC = () => {
               </Link>
             </nav>
 
-            <div className="pt-4 border-t border-neutral-200">
+            <div className="pt-4 border-t border-neutral-200 space-y-3">
+              <div className="flex sm:hidden">
+                <ApiStatusBadge />
+              </div>
               <p className="text-xs text-neutral-400 uppercase tracking-widest font-medium">
                 SHOES SHOP — STEP INTO YOUR STYLE.
               </p>
@@ -507,6 +526,10 @@ export const Navbar: React.FC = () => {
           </div>
         )}
       </header>
+      <SubscriptionModal
+        isOpen={isSubscriptionOpen}
+        onClose={() => setIsSubscriptionOpen(false)}
+      />
     </>
   );
 };

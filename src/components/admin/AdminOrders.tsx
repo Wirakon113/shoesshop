@@ -145,7 +145,7 @@ export const AdminOrders: React.FC = () => {
           <button
             onClick={() => {
               if (window.confirm('คุณต้องการรีเซ็ตรายการคำสั่งซื้อเป็นข้อมูลตัวอย่างตั้งต้นหรือไม่?')) {
-                resetOrdersCatalog();
+                void resetOrdersCatalog();
               }
             }}
             className="flex-1 sm:flex-initial py-2.5 px-3 border border-neutral-300 hover:border-black text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
@@ -317,7 +317,7 @@ export const AdminOrders: React.FC = () => {
                     <td className="py-3.5 px-4">
                       <select
                         value={order.status}
-                        onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
+                        onChange={(e) => void updateOrderStatus(order.id, e.target.value as OrderStatus)}
                         className={`text-xs font-bold uppercase px-2 py-1 border focus:outline-none cursor-pointer ${
                           order.status === 'pending'
                             ? 'bg-amber-50 text-amber-900 border-amber-300'
@@ -409,7 +409,7 @@ export const AdminOrders: React.FC = () => {
                   <button
                     key={st}
                     onClick={() => {
-                      updateOrderStatus(selectedOrder.id, st);
+                      void updateOrderStatus(selectedOrder.id, st);
                       setSelectedOrder((prev) => (prev ? { ...prev, status: st } : null));
                     }}
                     className={`px-2.5 py-1 text-xs font-bold uppercase transition-colors border ${
@@ -535,7 +535,7 @@ export const AdminOrders: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  deleteOrder(deleteConfirmId);
+                  void deleteOrder(deleteConfirmId);
                   setDeleteConfirmId(null);
                   if (selectedOrder?.id === deleteConfirmId) {
                     setSelectedOrder(null);

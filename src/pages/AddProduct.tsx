@@ -108,7 +108,7 @@ export const AddProduct: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -116,8 +116,8 @@ export const AddProduct: React.FC = () => {
       return;
     }
 
-    // Save to LocalStorage & Store Context
-    const created = addProduct({
+    // Save to SQLite API (หรือ localStorage ถ้าไม่มี server) & Store Context
+    const created = await addProduct({
       name: name.trim(),
       category,
       price: Number(price),
@@ -153,7 +153,7 @@ export const AddProduct: React.FC = () => {
     e.preventDefault();
     if (!editingProduct) return;
 
-    updateProduct(editingProduct.id, {
+    void updateProduct(editingProduct.id, {
       name: editingProduct.name,
       category: editingProduct.category,
       price: Number(editingProduct.price),
@@ -167,7 +167,7 @@ export const AddProduct: React.FC = () => {
 
   const executeDelete = () => {
     if (deleteConfirmId !== null) {
-      deleteProduct(deleteConfirmId);
+      void deleteProduct(deleteConfirmId);
       setDeleteConfirmId(null);
     }
   };

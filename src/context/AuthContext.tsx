@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { User, LoginCredentials, RegisterFormData, UserRole } from '../types';
+import { shopApi, isApiAvailable, waitForApi } from '../lib/api';
 
 const USERS_STORAGE_KEY = 'shoes_shop_users_v2';
 const CURRENT_USER_STORAGE_KEY = 'shoes_shop_current_user_v2';
@@ -10,7 +11,7 @@ export const INITIAL_USERS: User[] = [
     id: 'user_admin_1',
     name: 'ผู้ดูแลระบบ',
     lastname: 'ShoesShop',
-    email: 'admin@gmail.com.com', 
+    email: 'admin@gmail.com.com',
     phone: '081-234-5678',
     address: '100/1 ศูนย์การค้าสยามสแควร์ แขวงปทุมวัน',
     district: 'ปทุมวัน',
@@ -56,46 +57,48 @@ export const INITIAL_USERS: User[] = [
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
-  login: (credentials: LoginCredentials) => { success: boolean; error?: string; user?: User };
-  register: (data: RegisterFormData) => { success: boolean; error?: string; user?: User };
+  /** true = คุยกับ SQLite ผ่าน API, false = โหมด localStorage เดิม (เช่น บน GitHub Pages) */
+  useApi: boolean;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string; user?: User }>;
+  register: (data: RegisterFormData) => Promise<{ success: boolean; error?: string; user?: User }>;
   logout: () => void;
   isUsernameTaken: (username: string, excludeUserId?: string) => boolean;
   rememberedUsername: string;
-  updateUserRole: (userId: string, newRole: UserRole) => { success: boolean; message?: string };
-  deleteUser: (userId: string) => { success: boolean; message?: string };
-  addUserByAdmin: (userData: Omit<User, 'id' | 'createdAt'>) => { success: boolean; message?: string; user?: User };
-  updateUserByAdmin: (userId: string, userData: Partial<User>) => { success: boolean; message?: string };
-  resetUserStore: () => void;
+  updateUserRole: (userId: string, newRole: UserRole) => Promise<{ success: boolean; message?: string }>;
+  deleteUser: (userId: string) => Promise<{ success: boolean; message?: string }>;
+  addUserByAdmin: (userData: Omit<User, 'id' | 'createdAt'>) => Promise<{ success: boolean; message?: string; user?: User }>;
+  updateUserByAdmin: (userId: string, userData: Partial<User>) => Promise<{ success: boolean; message?: string }>;
+  resetUserStore: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(() => {
-    try {
-      const stored = localStorage.getItem(USERS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure admin2547 exists in parsed
-          const hasAdmin = parsed.some((u: User) => u.username.toLowerCase() === 'admin2547');
-          let updatedList = parsed.map((u: User) => ({
-            ...u,
-            role: u.role || (u.username.toLowerCase() === 'admin2547' ? 'admin' : 'user'),
-          }));
-
-          if (!hasAdmin) {
-            updatedList = [INITIAL_USERS[0], ...updatedList];
-          }
-          return updatedList;
-        }
+function loadLocalUsers(): User[] {
+  try {
+    const stored = localStorage.getItem(USERS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const hasAdmin = parsed.some((u: User) => u.username.toLowerCase() === 'admin2547');
+        const updatedList = parsed.map((u: User) => ({
+          ...u,
+          role: u.role || (u.username.toLowerCase() === 'admin2547' ? 'admin' : 'user'),
+        }));
+        if (!hasAdmin) return [INITIAL_USERS[0], ...updatedList];
+        return updatedList;
       }
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
-      return INITIAL_USERS;
-    } catch {
-      return INITIAL_USERS;
     }
-  });
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
+    return INITIAL_USERS;
+  } catch {
+    return INITIAL_USERS;
+  }
+}
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [users, setUsers] = useState<User[]>(() => loadLocalUsers());
+  const [useApi, setUseApi] = useState(false);
+  const useApiRef = useRef(false);
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -123,14 +126,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Save users to localStorage whenever updated
+  // ตรวจว่ามี API server (SQLite) ไหม — ถ้ามี ดึง users จาก DB แทน localStorage
+  // ลองหลายรอบเผื่อ server เพิ่งสตาร์ท (tsx cold start ช้า) และหน้าเว็บโหลดเร็วกว่า
   useEffect(() => {
+    let cancelled = false;
+    waitForApi().then(async (ok) => {
+      if (cancelled) return;
+      useApiRef.current = ok;
+      setUseApi(ok);
+      if (ok) {
+        try {
+          const list = (await shopApi.users()) as User[];
+          if (!cancelled && Array.isArray(list)) setUsers(list);
+        } catch {
+          // API หลุดระหว่างทาง → กลับไป localStorage
+          useApiRef.current = false;
+          setUseApi(false);
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refreshUsers = async () => {
+    if (!useApiRef.current) return;
+    try {
+      const list = (await shopApi.users()) as User[];
+      if (Array.isArray(list)) setUsers(list);
+    } catch {
+      useApiRef.current = false;
+      setUseApi(false);
+    }
+  };
+
+  // ก่อน mutation: ถ้าตอนนี้อยู่โหมด local ให้ลองต่อ API ใหม่อีกรอบ
+  // (กันกรณีเปิดหน้าเว็บตอน server ยังไม่ติด แล้ว server มาติดทีหลัง —
+  // ไม่เช่นนั้นข้อมูลจะลงผิดที่โดยไม่รู้ตัว)
+  const upgradeToApi = async (): Promise<boolean> => {
+    if (useApiRef.current) return true;
+    if (!(await isApiAvailable())) return false;
+    useApiRef.current = true;
+    setUseApi(true);
+    await refreshUsers();
+    return useApiRef.current;
+  };
+
+  // Save users to localStorage whenever updated (โหมด localStorage เท่านั้น)
+  useEffect(() => {
+    if (useApiRef.current) return;
     try {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
     } catch (e) {
       console.error('Failed to save users to localStorage', e);
     }
-  }, [users]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, useApi]);
 
   // Save currentUser to localStorage whenever updated
   useEffect(() => {
@@ -150,9 +202,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return users.some((u) => u.username.toLowerCase() === cleanUsername && u.id !== excludeUserId);
   };
 
-  const login = (credentials: LoginCredentials): { success: boolean; error?: string; user?: User } => {
+  const applyRememberMe = (cleanUsername: string, rememberMe?: boolean) => {
+    if (rememberMe) {
+      localStorage.setItem(REMEMBERED_USERNAME_KEY, cleanUsername);
+      setRememberedUsername(cleanUsername);
+    } else {
+      localStorage.removeItem(REMEMBERED_USERNAME_KEY);
+      setRememberedUsername('');
+    }
+  };
+
+  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string; user?: User }> => {
     const { username, password, rememberMe } = credentials;
     const cleanUsername = username.trim();
+
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        const user = (await shopApi.login(cleanUsername, password)) as User;
+        applyRememberMe(cleanUsername, rememberMe);
+        setCurrentUser(user);
+        return { success: true, user };
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'เข้าสู่ระบบไม่สำเร็จ' };
+      }
+    }
 
     const user = users.find(
       (u) => u.username.toLowerCase() === cleanUsername.toLowerCase() && u.password === password
@@ -165,22 +239,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Handle remember me
-    if (rememberMe) {
-      localStorage.setItem(REMEMBERED_USERNAME_KEY, cleanUsername);
-      setRememberedUsername(cleanUsername);
-    } else {
-      localStorage.removeItem(REMEMBERED_USERNAME_KEY);
-      setRememberedUsername('');
-    }
-
+    applyRememberMe(cleanUsername, rememberMe);
     const { password: _, ...safeUser } = user;
     const loggedUser = safeUser as User;
     setCurrentUser(loggedUser);
     return { success: true, user: loggedUser };
   };
 
-  const register = (data: RegisterFormData): { success: boolean; error?: string; user?: User } => {
+  const register = async (data: RegisterFormData): Promise<{ success: boolean; error?: string; user?: User }> => {
     const {
       name,
       lastname,
@@ -203,6 +269,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (password !== confirmPassword) {
       return { success: false, error: 'รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน' };
+    }
+
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        const user = (await shopApi.register({
+          name: name.trim(),
+          lastname: lastname.trim(),
+          email: email.trim().toLowerCase(),
+          address: address.trim(),
+          postalCode: postalCode ? postalCode.trim() : '',
+          province: province ? province.trim() : 'กรุงเทพมหานคร',
+          district: district ? district.trim() : '',
+          phone: phone?.trim() || '',
+          username: username.trim(),
+          password,
+        })) as User;
+        await refreshUsers();
+        setCurrentUser(user);
+        return { success: true, user };
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : 'สมัครสมาชิกไม่สำเร็จ' };
+      }
     }
 
     if (isUsernameTaken(username)) {
@@ -228,7 +317,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setUsers((prev) => [...prev, newUser]);
-    
+
     // Automatically log in the registered user
     const { password: _, ...safeUser } = newUser;
     const userToSet = safeUser as User;
@@ -241,14 +330,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
   };
 
-  const updateUserRole = (userId: string, newRole: UserRole): { success: boolean; message?: string } => {
-    const user = users.find((u) => u.id === userId);
-    if (!user) {
+  const updateUserRole = async (userId: string, newRole: UserRole): Promise<{ success: boolean; message?: string }> => {
+    const user = users.find((u) => u.id === userId);    if (!user) {
       return { success: false, message: 'ไม่พบผู้ใช้งานนี้ในระบบ' };
     }
 
     if (user.username.toLowerCase() === 'admin2547' && newRole !== 'admin') {
       return { success: false, message: 'ไม่สามารถเปลี่ยน Role ของบัญชี Super Admin หลัก (admin2547) ได้' };
+    }
+
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        const updated = (await shopApi.updateUser(userId, { role: newRole })) as User;
+        await refreshUsers();
+        if (currentUser && currentUser.id === userId) {
+          setCurrentUser((prev) => (prev ? { ...prev, role: updated.role } : null));
+        }
+        return { success: true, message: `เปลี่ยนสิทธิ์ผู้ใช้เป็น ${newRole.toUpperCase()} เรียบร้อยแล้ว` };
+      } catch (e) {
+        return { success: false, message: e instanceof Error ? e.message : 'เปลี่ยนสิทธิ์ไม่สำเร็จ' };
+      }
     }
 
     setUsers((prev) =>
@@ -263,7 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: `เปลี่ยนสิทธิ์ผู้ใช้เป็น ${newRole.toUpperCase()} เรียบร้อยแล้ว` };
   };
 
-  const deleteUser = (userId: string): { success: boolean; message?: string } => {
+  const deleteUser = async (userId: string): Promise<{ success: boolean; message?: string }> => {
     const target = users.find((u) => u.id === userId);
     if (!target) {
       return { success: false, message: 'ไม่พบผู้ใช้ที่ต้องการลบ' };
@@ -277,11 +379,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'คุณไม่สามารถลบบัญชีของตัวเองขณะกำลังเข้าสู่ระบบได้' };
     }
 
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        await shopApi.deleteUser(userId);
+        await refreshUsers();
+        return { success: true, message: `ลบผู้ใช้ @${target.username} สำเร็จ` };
+      } catch (e) {
+        return { success: false, message: e instanceof Error ? e.message : 'ลบผู้ใช้ไม่สำเร็จ' };
+      }
+    }
+
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     return { success: true, message: `ลบผู้ใช้ @${target.username} สำเร็จ` };
   };
 
-  const addUserByAdmin = (userData: Omit<User, 'id' | 'createdAt'>): { success: boolean; message?: string; user?: User } => {
+  const addUserByAdmin = async (userData: Omit<User, 'id' | 'createdAt'>): Promise<{ success: boolean; message?: string; user?: User }> => {
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        const { createdAt: _c, id: _i, ...payload } = userData as User & { createdAt?: string; id?: string };
+        const user = (await shopApi.createUser(payload)) as User;
+        await refreshUsers();
+        return { success: true, message: `เพิ่มผู้ใช้งาน @${user.username} สำเร็จ`, user };
+      } catch (e) {
+        return { success: false, message: e instanceof Error ? e.message : 'เพิ่มผู้ใช้ไม่สำเร็จ' };
+      }
+    }
+
     if (isUsernameTaken(userData.username)) {
       return { success: false, message: `Username "${userData.username}" ถูกใช้งานแล้ว` };
     }
@@ -296,7 +421,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: `เพิ่มผู้ใช้งาน @${newUser.username} สำเร็จ`, user: newUser };
   };
 
-  const updateUserByAdmin = (userId: string, userData: Partial<User>): { success: boolean; message?: string } => {
+  const updateUserByAdmin = async (userId: string, userData: Partial<User>): Promise<{ success: boolean; message?: string }> => {
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        const updated = (await shopApi.updateUser(userId, userData)) as User;
+        await refreshUsers();
+        if (currentUser && currentUser.id === userId) {
+          setCurrentUser((prev) => (prev ? { ...prev, ...updated } : null));
+        }
+        return { success: true, message: 'อัปเดตข้อมูลผู้ใช้สำเร็จ' };
+      } catch (e) {
+        return { success: false, message: e instanceof Error ? e.message : 'อัปเดตข้อมูลไม่สำเร็จ' };
+      }
+    }
+
     if (userData.username && isUsernameTaken(userData.username, userId)) {
       return { success: false, message: `Username "${userData.username}" ถูกใช้งานแล้ว` };
     }
@@ -317,7 +456,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: 'อัปเดตข้อมูลผู้ใช้สำเร็จ' };
   };
 
-  const resetUserStore = () => {
+  const resetUserStore = async () => {
+    await upgradeToApi();
+    if (useApiRef.current) {
+      try {
+        await shopApi.resetUsers();
+        await refreshUsers();
+        return;
+      } catch {
+        // fall through to local reset
+      }
+    }
     setUsers(INITIAL_USERS);
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
   };
@@ -327,6 +476,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         currentUser,
         users,
+        useApi,
         login,
         register,
         logout,

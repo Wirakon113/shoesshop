@@ -142,11 +142,11 @@ export const AdminProducts: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmitAdd = (e: React.FormEvent) => {
+  const handleSubmitAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    addProduct({
+    await addProduct({
       name: formData.name.trim(),
       category: formData.category,
       price: Number(formData.price),
@@ -163,11 +163,18 @@ export const AdminProducts: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct || !validateForm()) return;
 
-    updateProduct(editingProduct.id, {
+    // รักษาแกลเลอรีเดิมไว้: รูปหลักใหม่ขึ้นก่อน + ตัดรูปหลักเก่า/รูปซ้ำออก
+    const prevGallery = editingProduct.additionalImages ?? [];
+    const nextGallery = [
+      formData.image,
+      ...prevGallery.filter((u) => u !== editingProduct.image && u !== formData.image),
+    ];
+
+    await updateProduct(editingProduct.id, {
       name: formData.name.trim(),
       category: formData.category,
       price: Number(formData.price),
@@ -175,6 +182,7 @@ export const AdminProducts: React.FC = () => {
       sku: formData.sku.trim() || undefined,
       description: formData.description.trim(),
       image: formData.image,
+      additionalImages: nextGallery,
       sizes: formData.sizes,
       featured: formData.featured,
       isNew: formData.isNew,
@@ -185,7 +193,7 @@ export const AdminProducts: React.FC = () => {
 
   const handleStockQuickChange = (product: Product, delta: number) => {
     const newStock = Math.max(0, product.stock + delta);
-    updateProduct(product.id, { stock: newStock });
+    void updateProduct(product.id, { stock: newStock });
   };
 
   const formatPrice = (amount: number) => {
@@ -214,7 +222,7 @@ export const AdminProducts: React.FC = () => {
           <button
             onClick={() => {
               if (window.confirm('คุณต้องการรีเซ็ตแคตตาล็อกสินค้าเป็น 10 รายการเริ่มต้นหรือไม่?')) {
-                resetCatalog();
+                void resetCatalog();
               }
             }}
             className="flex-1 sm:flex-initial py-2.5 px-3 border border-neutral-300 hover:border-black text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
@@ -739,7 +747,7 @@ export const AdminProducts: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  deleteProduct(deleteConfirmId);
+                  void deleteProduct(deleteConfirmId);
                   setDeleteConfirmId(null);
                 }}
                 className="py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider transition-colors"

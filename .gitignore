@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+# SQLite runtime files (สร้างจาก npx tsx database/init.ts)
+*.db
+*.db-wal
+*.db-shm
+*.db-journal

@@ -101,8 +101,8 @@ export const Login: React.FC = () => {
     setErrors({});
 
     // Simulate snappy login processing
-    setTimeout(() => {
-      const res = login({
+    setTimeout(async () => {
+      const res = await login({
         username: username.trim(),
         password,
         rememberMe,

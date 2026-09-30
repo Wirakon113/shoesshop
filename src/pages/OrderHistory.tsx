@@ -111,7 +111,7 @@ export const OrderHistory: React.FC = () => {
 
   const handleCancelOrder = (orderId: string) => {
     if (window.confirm('คุณต้องการยกเลิกคำสั่งซื้อนี้ใช่หรือไม่?')) {
-      cancelOrder(orderId);
+      void cancelOrder(orderId);
       showToast('ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว', 'info');
       if (selectedOrder?.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
@@ -120,7 +120,7 @@ export const OrderHistory: React.FC = () => {
   };
 
   const handleReorder = (order: Order) => {
-    reorderItems(order);
+    void reorderItems(order.items);
     showToast('เพิ่มรายการสินค้าลงในตะกร้าเรียบร้อยแล้ว', 'success');
   };
 

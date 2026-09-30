@@ -266,6 +266,25 @@ export const Register: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // เรียก PHP API เพื่อส่ง Welcome Email (ไม่บล็อกการลงทะเบียน — fire-and-forget)
+  // กำหนด URL ได้ผ่าน VITE_WELCOME_EMAIL_URL หรือใช้ค่าเริ่มต้นที่ชี้ไปยัง XAMPP
+  const sendWelcomeEmail = async (email: string, fullName: string) => {
+    try {
+      const apiUrl: string =
+        (import.meta.env.VITE_WELCOME_EMAIL_URL as string) ||
+        'http://localhost:8000/send_welcome.php';
+
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: fullName }),
+      });
+    } catch (err) {
+      // เงียบ ๆ ไม่รบกวนผู้ใช้ — ถ้าส่งเมลไม่สำเร็จไม่ควรขัดการลงทะเบียน
+      console.warn('ไม่สามารถส่ง Welcome Email ได้ (ไม่ต้องกวนผู้ใช้):', err);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -277,13 +296,14 @@ export const Register: React.FC = () => {
     setIsSubmitting(true);
     setErrors({});
 
-    setTimeout(() => {
-      const res = register(formData);
+    setTimeout(async () => {
+      const res = await register(formData);
       setIsSubmitting(false);
 
       if (res.success) {
         showToast('สร้างบัญชีสำเร็จ ยินดีต้อนรับสู่ Shoes Shop!', 'success');
         navigate('/', { replace: true });
+        sendWelcomeEmail(formData.email, `${formData.name} ${formData.lastname}`);
       } else {
         setErrors({ general: res.error || 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง' });
       }

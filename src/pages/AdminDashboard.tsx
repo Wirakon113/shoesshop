@@ -62,8 +62,8 @@ export const AdminDashboard: React.FC = () => {
 
           <div className="space-y-3">
             <button
-              onClick={() => {
-                const res = login({ username: 'admin2547', password: 'admin2547' });
+              onClick={async () => {
+                const res = await login({ username: 'admin2547', password: 'admin2547' });
                 if (res.success) {
                   navigate('/admin');
                 }

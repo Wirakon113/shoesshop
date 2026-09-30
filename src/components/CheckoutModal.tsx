@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useAuth } from '../context/AuthContext';
 import { X, CheckCircle2, CreditCard, QrCode, Truck, ArrowRight, ArrowLeft, PackageCheck, ShoppingBag, ChevronDown, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { THAI_PROVINCES, getDistrictsByProvince, getPostalCode } from '../data/thaiLocations';
+
+// Root-absolute so the request reaches the PHP endpoint from any route.
+// A bare relative URL would resolve against e.g. /cart and return index.html
+// instead of the mailer. In dev, Vite proxies this path to the PHP server
+// (see vite.config.ts); on static hosts without PHP the call simply fails
+// and the order flow continues with an email-failed notice.
+const EMAIL_ENDPOINT = `${import.meta.env.BASE_URL}phpmailer_welcome/confirmbuy.php`;
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -28,34 +35,56 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     notes: '',
   });
   const [orderNumber, setOrderNumber] = useState('');
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'failed'>('idle');
+  const [placedTotal, setPlacedTotal] = useState(0);
+  // Tracks whether the open-prefill below already ran for the current
+  // open session. The parent passes a new `onClose` closure (and the store
+  // provides a new `showToast`) on every render, so this effect must NOT
+  // re-run on those identities — otherwise it would reset `step` back to
+  // 'details' right after a successful submit (order created + cart cleared
+  // re-render the tree) and the success screen would never stick.
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      if (!currentUser) {
-        onClose();
-        showToast('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อสินค้า', 'warning');
-        navigate('/login', {
-          state: {
-            from: { pathname: '/cart' },
-            message: 'กรุณาเข้าสู่ระบบเพื่อดำเนินการสั่งซื้อสินค้าและชำระเงิน',
-          },
-        });
-        return;
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        firstName: currentUser.name || prev.firstName,
-        lastName: currentUser.lastname || prev.lastName,
-        email: currentUser.email || prev.email,
-        phone: currentUser.phone || prev.phone,
-        address: currentUser.address || prev.address,
-        district: currentUser.district || prev.district || '',
-        province: currentUser.province || prev.province || 'กรุงเทพมหานคร',
-        postalCode: currentUser.postalCode || prev.postalCode || '',
-      }));
-      setStep('details');
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
     }
+    if (wasOpenRef.current) {
+      return;
+    }
+    wasOpenRef.current = true;
+    if (!currentUser) {
+      onClose();
+      showToast('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อสินค้า', 'warning');
+      navigate('/login', {
+        state: {
+          from: { pathname: '/cart' },
+          message: 'กรุณาเข้าสู่ระบบเพื่อดำเนินการสั่งซื้อสินค้าและชำระเงิน',
+        },
+      });
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      firstName: currentUser.name || prev.firstName,
+      lastName: currentUser.lastname || prev.lastName,
+      email: currentUser.email || prev.email,
+      phone: currentUser.phone || prev.phone,
+      address: currentUser.address || prev.address,
+      district: currentUser.district || prev.district || '',
+      province: currentUser.province || prev.province || 'กรุงเทพมหานคร',
+      postalCode: currentUser.postalCode || prev.postalCode || '',
+    }));
+    setStep('details');
+    setOrderNumber('');
+    setFormError('');
+    setEmailStatus('idle');
+    setPlacedTotal(0);
+    setIsPlacing(false);
   }, [currentUser, isOpen, navigate, onClose, showToast]);
 
   if (!isOpen) return null;
@@ -70,23 +99,126 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     maximumFractionDigits: 0,
   }).format(finalTotal);
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const fullAddress = [
-      formData.address.trim(),
-      formData.district ? `แขวง/ตำบล ${formData.district.trim()}` : '',
-      `จ.${formData.province.trim()}`,
-      formData.postalCode.trim(),
-    ].filter(Boolean).join(' ');
+  const formattedPlacedTotal = new Intl.NumberFormat('th-TH', {
+    style: 'currency',
+    currency: 'THB',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(placedTotal);
 
-    const newOrder = createOrder({
-      userId: currentUser?.id,
-      customerName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-      customerEmail: formData.email.trim(),
-      customerPhone: formData.phone.trim() || '089-999-9999',
-      shippingAddress: fullAddress,
-      items: cart.map((item) => ({
+  const validateCheckoutForm = (): string => {
+    if (!formData.firstName.trim()) return 'กรุณากรอกชื่อจริง (First Name)';
+    if (!formData.lastName.trim()) return 'กรุณากรอกนามสกุล (Last Name)';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      return 'กรุณากรอกอีเมลให้ถูกต้อง เช่น example@gmail.com';
+    }
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (phoneDigits.length < 9 || phoneDigits.length > 10) {
+      return 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (9–10 หลัก)';
+    }
+    if (!formData.address.trim()) return 'กรุณากรอกที่อยู่ / บ้านเลขที่ ถนน';
+    if (!formData.province.trim()) return 'กรุณาเลือกจังหวัด (Province)';
+    if (!formData.district.trim()) return 'กรุณาเลือกแขวง / ตำบล / เขต (District)';
+    if (!/^\d{5}$/.test(formData.postalCode.trim())) {
+      return 'กรุณากรอกรหัสไปรษณีย์ 5 หลักให้ถูกต้อง';
+    }
+    if (paymentMethod !== 'promptpay' && paymentMethod !== 'card' && paymentMethod !== 'cod') {
+      return 'กรุณาเลือกช่องทางการชำระเงิน';
+    }
+    return '';
+  };
+
+  // Best-effort confirmation email via the existing PHPMailer endpoint
+  // (same relative-path pattern as SubscriptionModal). The order is already
+  // saved locally at this point, so an email failure must NOT roll back or
+  // duplicate the order — it only flips the notice shown on success.
+  const sendOrderConfirmationEmail = async (payload: {
+    email: string;
+    customerName: string;
+    orderId: string;
+    createdAt: string;
+    status: string;
+    paymentMethod: string;
+    shippingAddress: string;
+    customerPhone: string;
+    subtotal: number;
+    shippingCost: number;
+    total: number;
+    notes?: string;
+    items: { productId: number; name: string; price: number; size: number; quantity: number; image: string }[];
+  }): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 10000);
+      let response: Response;
+      try {
+        response = await fetch(EMAIL_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeout);
+      }
+      if (!response.ok) {
+        const reason = `email endpoint HTTP ${response.status}`;
+        console.error('[checkout] confirmation email failed:', reason);
+        return { ok: false, error: reason };
+      }
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const reason = 'email service did not return JSON (email service unavailable)';
+        console.error('[checkout] confirmation email failed:', reason, `(${contentType || 'unknown content-type'})`);
+        return { ok: false, error: reason };
+      }
+      const result = await response.json();
+      if (result && result.success === true) {
+        return { ok: true };
+      }
+      const reason =
+        (result && typeof result.error === 'string' && result.error) ||
+        'email service rejected the request';
+      console.error('[checkout] confirmation email failed:', reason);
+      return { ok: false, error: reason };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'network error';
+      console.error('[checkout] confirmation email failed:', reason);
+      return { ok: false, error: reason };
+    }
+  };
+
+  const handleSubmitOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Prevent duplicate orders from rapid / double clicks.
+    if (isPlacing) return;
+
+    if (cart.length === 0) {
+      const msg = 'ตะกร้าสินค้าว่าง ไม่สามารถสั่งซื้อได้';
+      setFormError(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
+    const validationError = validateCheckoutForm();
+    if (validationError) {
+      // Do NOT create an order, clear the cart, or send any email.
+      setFormError(validationError);
+      showToast(validationError, 'error');
+      return;
+    }
+    setFormError('');
+
+    setIsPlacing(true);
+    setEmailStatus('idle');
+
+    try {
+      // Snapshot everything BEFORE create/clear so the success screen and
+      // the email use the real totals even after the cart is emptied.
+      const snapshotItems = cart.map((item) => ({
         productId: item.productId,
         name: item.name,
         category: item.category,
@@ -94,23 +226,92 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         size: item.size,
         quantity: item.quantity,
         image: item.image,
-      })),
-      subtotal: cartTotal,
-      shippingCost: shippingCost,
-      total: finalTotal,
-      paymentMethod: paymentMethod,
-      status: 'pending',
-      notes: formData.notes.trim() || undefined,
-    });
+      }));
+      const snapshotSubtotal = cartTotal;
+      const snapshotShipping = shippingCost;
+      const snapshotTotal = finalTotal;
+      const customerEmail = formData.email.trim();
+      const customerName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+      const customerPhone = formData.phone.trim();
+      const fullAddress = [
+        formData.address.trim(),
+        formData.district ? `แขวง/ตำบล ${formData.district.trim()}` : '',
+        `จ.${formData.province.trim()}`,
+        formData.postalCode.trim(),
+      ].filter(Boolean).join(' ');
 
-    setOrderNumber(newOrder.id);
-    setStep('success');
-    clearCart();
+      // 1) Create + save the order first (SQLite API หรือ localStorage store).
+      const newOrder = await createOrder({
+        userId: currentUser?.id,
+        customerName,
+        customerEmail,
+        customerPhone,
+        shippingAddress: fullAddress,
+        items: snapshotItems,
+        subtotal: snapshotSubtotal,
+        shippingCost: snapshotShipping,
+        total: snapshotTotal,
+        paymentMethod: paymentMethod,
+        status: 'pending',
+        notes: formData.notes.trim() || undefined,
+      });
+
+      // 2) Flip to the success step BEFORE any async work, so a re-render
+      // can never leave the user stuck on SHIPPING & PAYMENT.
+      setOrderNumber(newOrder.id);
+      setPlacedTotal(snapshotTotal);
+      setStep('success');
+
+      // 3) Send the confirmation email (best-effort; order stays valid).
+      const { ok: emailSent } = await sendOrderConfirmationEmail({
+        email: customerEmail,
+        customerName,
+        orderId: newOrder.id,
+        createdAt: newOrder.createdAt,
+        status: newOrder.status,
+        paymentMethod,
+        shippingAddress: fullAddress,
+        customerPhone,
+        subtotal: snapshotSubtotal,
+        shippingCost: snapshotShipping,
+        total: snapshotTotal,
+        notes: formData.notes.trim() || undefined,
+        items: snapshotItems.map(({ productId, name, price, size, quantity, image }) => ({
+          productId,
+          name,
+          price,
+          size,
+          quantity,
+          image,
+        })),
+      });
+      setEmailStatus(emailSent ? 'sent' : 'failed');
+
+      // 4) Clear the cart silently ONLY after the order exists — no
+      // misleading "cart cleared" toast; report the order outcome instead.
+      await clearCart(true);
+      if (emailSent) {
+        showToast(`สั่งซื้อสำเร็จ! หมายเลขคำสั่งซื้อ ${newOrder.id}`, 'success');
+      } else {
+        showToast(
+          `สั่งซื้อสำเร็จ ${newOrder.id} แต่ส่งอีเมลยืนยันไม่สำเร็จ กรุณาตรวจสอบอีเมลหรือติดต่อร้าน`,
+          'info'
+        );
+      }
+    } catch {
+      // Order NOT created (or not confirmed): keep the cart untouched.
+      const msg = 'ไม่สามารถสร้างคำสั่งซื้อได้ กรุณาลองใหม่อีกครั้ง';
+      setFormError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setIsPlacing(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (formError) setFormError('');
   };
 
   const handleProvinceChange = (newProvince: string) => {
@@ -170,6 +371,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
               <h2 className="text-2xl font-black text-black tracking-tight mt-1">SHIPPING & PAYMENT</h2>
               <p className="text-xs text-neutral-500 mt-0.5">ระบุที่อยู่จัดส่งและเลือกช่องทางการชำระเงิน</p>
             </div>
+
+            {formError && (
+              <div className="mb-4 border border-red-300 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
+                {formError}
+              </div>
+            )}
 
             <form onSubmit={handleSubmitOrder} className="space-y-6">
               {/* Contact Information */}
@@ -413,10 +620,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                 <button
                   type="submit"
                   id="checkout-confirm-btn"
-                  className="w-full sm:w-2/3 bg-black text-white py-3.5 px-4 text-xs uppercase tracking-[0.2em] font-bold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                  disabled={isPlacing}
+                  className="w-full sm:w-2/3 bg-black text-white py-3.5 px-4 text-xs uppercase tracking-[0.2em] font-bold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-black"
                 >
-                  <span>ยืนยันสั่งซื้อ (Confirm Order)</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {isPlacing ? (
+                    <span>กำลังดำเนินการสั่งซื้อ... (PROCESSING...)</span>
+                  ) : (
+                    <>
+                      <span>ยืนยันสั่งซื้อ (Confirm Order)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -452,13 +666,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
               </div>
               <div className="flex justify-between pt-2 border-t border-neutral-200">
                 <span className="text-neutral-500">ยอดชำระสุทธิ:</span>
-                <span className="font-bold text-black text-sm">{formattedFinalTotal}</span>
+                <span className="font-bold text-black text-sm">{formattedPlacedTotal}</span>
               </div>
             </div>
 
             <p className="text-xs text-neutral-500">
               ระบบได้บันทึกคำสั่งซื้อเรียบร้อยแล้ว คุณสามารถตรวจสอบสถานะการจัดส่งได้ที่หน้าประวัติการสั่งซื้อ
             </p>
+
+            {emailStatus === 'sent' && (
+              <p className="text-xs text-green-700 border border-green-200 bg-green-50 px-3 py-2">
+                ส่งอีเมลยืนยันคำสั่งซื้อไปที่ {formData.email} เรียบร้อยแล้ว
+              </p>
+            )}
+            {emailStatus === 'failed' && (
+              <p className="text-xs text-amber-800 border border-amber-200 bg-amber-50 px-3 py-2">
+                สร้างคำสั่งซื้อสำเร็จแล้ว แต่ส่งอีเมลยืนยันไม่สำเร็จ กรุณาตรวจสอบอีเมลของคุณหรือติดต่อร้าน
+              </p>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <button

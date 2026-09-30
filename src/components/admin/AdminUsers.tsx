@@ -156,11 +156,11 @@ export const AdminUsers: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmitAdd = (e: React.FormEvent) => {
+  const handleSubmitAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm(false)) return;
 
-    const result = addUserByAdmin({
+    const result = await addUserByAdmin({
       name: formData.name.trim(),
       lastname: formData.lastname.trim(),
       email: formData.email.trim().toLowerCase(),
@@ -181,7 +181,7 @@ export const AdminUsers: React.FC = () => {
     }
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
+  const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser || !validateForm(true)) return;
 
@@ -202,7 +202,7 @@ export const AdminUsers: React.FC = () => {
       updatePayload.password = formData.password.trim();
     }
 
-    const result = updateUserByAdmin(editingUser.id, updatePayload);
+    const result = await updateUserByAdmin(editingUser.id, updatePayload);
     if (result.success) {
       setEditingUser(null);
     } else {
@@ -212,7 +212,7 @@ export const AdminUsers: React.FC = () => {
 
   const handleToggleRole = (user: User) => {
     const newRole: UserRole = user.role === 'admin' ? 'user' : 'admin';
-    updateUserRole(user.id, newRole);
+    void updateUserRole(user.id, newRole);
   };
 
   const formatDate = (isoString: string) => {
@@ -246,7 +246,7 @@ export const AdminUsers: React.FC = () => {
           <button
             onClick={() => {
               if (window.confirm('คุณต้องการรีเซ็ตรายชื่อผู้ใช้เป็นค่าเริ่มต้น (รวมถึง admin2547) หรือไม่?')) {
-                resetUserStore();
+                void resetUserStore();
               }
             }}
             className="flex-1 sm:flex-initial py-2.5 px-3 border border-neutral-300 hover:border-black text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
@@ -914,7 +914,7 @@ export const AdminUsers: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  deleteUser(deleteConfirmId);
+                  void deleteUser(deleteConfirmId);
                   setDeleteConfirmId(null);
                 }}
                 className="py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider transition-colors"
