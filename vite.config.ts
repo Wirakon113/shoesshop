@@ -4,8 +4,13 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  const isAIStudio = Boolean(process.env.K_SERVICE || process.env.APPLET_ID);
+  const isProd = process.env.NODE_ENV === 'production';
+  // Use root '/' when running inside AI Studio container, and '/shoesshop/' when building for GitHub Pages
+  const base = process.env.BASE_PATH || (isAIStudio ? '/' : (isProd ? '/shoesshop/' : '/'));
+
   return {
-    base: process.env.BASE_PATH || (process.env.NODE_ENV === 'production' && process.env.GITHUB_PAGES ? '/shoesshop/' : (process.env.BASE_URL || '/')),
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
